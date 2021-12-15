@@ -1,0 +1,28 @@
+{
+    "name": "obd/logtracker",
+    "description": "User activity log manager. All kind of database activity will be tracked",
+    "type": "package",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "ronykader",
+            "email": "rony.ksr06@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Obd\\Logtracker\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Obd\\Logtracker\\LogtrackerServiceProvider"
+            ]
+        }
+    }
+    
+}
