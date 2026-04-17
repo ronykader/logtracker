@@ -33,22 +33,16 @@ trait Logtrackerable
         $service_id = $tableName == 'service' ? $serviceId : '';
         /************End code only for mygov project (services)************/ 
 
-        $userId = auth()->check() ? auth()->user()->id : Session::get('user')['id'] ?? 1; //For SSO login Or Admin Login
+        $sessionUser = Session::get('user');
+        $userId = auth()->check() ? auth()->user()->id : ($sessionUser['id'] ?? 1); //For SSO login Or Admin Login
         
-        // $user_array = [
-        //     'id' => $userInfo['id'],
-        //     'name' => $userInfo['userName'],
-        //     'designation' => $userInfo['designation'],
-        //     'officeNameEng' => $userInfo['officeNameEng'],
-        //     'officeNameBng' => $userInfo['officeNameBng']
-        // ];
-        
+        $authUser = auth()->user();
         $user_array = [
-            'id' => auth()->user()->id,
-            'name' => auth()->user()->name,
-            'designation' => auth()->user()->designation ?? '',
-            'officeNameEng' => auth()->user()->officeNameEng ?? '',
-            'officeNameBng' => auth()->user()->officeNameBng ?? ''
+            'id' => $authUser->id ?? $sessionUser['id'] ?? 1,
+            'name' => $authUser->name ?? $sessionUser['userName'] ?? '',
+            'designation' => $authUser->designation ?? '',
+            'officeNameEng' => $authUser->officeNameEng ?? '',
+            'officeNameBng' => $authUser->officeNameBng ?? ''
         ];
         $userInfo = json_encode($user_array);
 

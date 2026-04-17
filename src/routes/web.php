@@ -1,16 +1,18 @@
 <?php 
 
-use Obd\Logtracker\Http\Middleware\VerifyLogApiToken;
+use Illuminate\Support\Facades\Route;
 use Obd\Logtracker\Http\Controllers\LogtrackerController;
 
-
-
-Route::group(['prefix' => 'api/audit-panel-data'], function () {
-    
-    /*************Default Logs API******************/
+Route::group([
+    'prefix' => config('logtracker.api_prefix', 'api/audit-panel-data'),
+    'middleware' => config('logtracker.api_middleware', ['web', 'auth']),
+], function () {
     Route::get('/', [LogtrackerController::class,'logApidata']);
+});
 
-    /**************Only for MongoDB**************** */
-    Route::get('/log-synchronous', [LogtrackerController::class,'getUnsynchronousData']);
-    Route::post('/log-synchronous', [LogtrackerController::class,'synchronousProcess']);
+Route::group([
+    'prefix' => config('logtracker.route_prefix', 'audit-panel'),
+    'middleware' => config('logtracker.ui_middleware', ['web', 'auth']),
+], function () {
+    Route::get('/', [LogtrackerController::class, 'index']);
 });

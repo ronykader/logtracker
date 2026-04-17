@@ -3,7 +3,7 @@
 namespace Obd\Logtracker\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use App\Http\Controllers\Controller;
 use Obd\Logtracker\Models\Logtracker;
 
@@ -11,55 +11,91 @@ class LogtrackerController extends Controller
 {
     
     /**
-     * @TODO: 
-     *  - RETURN LOGS INFORMATION IN DETAILS
-     *  - RETURN TABLE LIST OF THIS PROJECTS
-     *  - RETURN USERS LIST OF THIS PROJECTS
-     *  - RETURN SERVICE LIST ONLY FOR MY GOV PROJECTS
-     *
-     * @param Request $request
-     * @return JSON
+     * Display the audit panel UI.
      */
+    public function index()
+    {
+        return view('logtracker::auditpanel.index');
+    }
+
     public function logApidata(Request $request)
     {
-        // Fetch all table from the database
-        $allTable = array_map('current', DB::select('SHOW TABLES'));
+        $query = Logtracker::orderBy('id', 'desc');
 
-        // Exclude unnecessary table from the table list
-        $exclude = ['failed_jobs', 'password_resets', 'migrations', 'logtrackers','personal_access_tokens'];
-        
-        // Prepare Executable table list 
-        $tables = array_diff($allTable, $exclude);
+        if ($request->filled('table')) {
+            $query->where('table_name', $request->query('table'));
+        }
 
-        /**
-         * Get all service List
-         */
-        // $services = DB::table('my_gov_service')->select(['id','name_en','name','sector'])->get();
-        
-        // Fetch logable data
-        $data = Logtracker::orderBy('id', 'desc')->select([
-            'id','users','user_id','log_date','table_name','log_type','new_data','data'
-        ])
-        ->get()->map(function($data) {
-            // It will remove from here later and handle it from core project
+        if ($request->filled('type')) {
+            $query->where('log_type', $request->query('type'));
+        }
+
+        if ($request->filled('user')) {
+            $query->where('users', 'like', '%' . $request->query('user') . '%');
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->query('search');
+            $query->where(function ($subQuery) use ($search) {
+                $subQuery->where('new_data', 'like', '%' . $search . '%')
+                    ->orWhere('data', 'like', '%' . $search . '%')
+                    ->orWhere('users', 'like', '%' . $search . '%')
+                    ->orWhere('table_name', 'like', '%' . $search . '%');
+            });
+        }
+
+        $perPage = (int) $request->query('per_page', 10);
+        if ($perPage < 1) {
+            $perPage = 10;
+        }
+
+        $filterQuery = clone $query;
+        $filterQuery->getQuery()->orders = null;
+        $logTables = $filterQuery->select('table_name')->distinct()->pluck('table_name')->filter()->values();
+        $logUsers = $filterQuery->select('users')->distinct()->pluck('users')->filter()->values();
+        $logTypes = $filterQuery->select('log_type')->distinct()->pluck('log_type')->filter()->values();
+
+        $pagination = $query->select([
+            'id', 'users', 'user_id', 'log_date', 'table_name', 'log_type', 'new_data', 'data'
+        ])->paginate($perPage)->appends($request->query());
+
+        $data = $pagination->getCollection()->map(function ($log) {
+            $logDate = $log->log_date instanceof Carbon ? $log->log_date : Carbon::parse($log->log_date);
+
             return [
-                'id' => $data->id,
-                'users' => $data->users,
-                'user_id' => $data->user_id,
-                'username' => $data->user_id,
-                'log_date' => $data->log_date->format('Y-m-d'),
-                'log_time' => $data->log_date->format('H:i:s a'),
-                'human_date' => $data->log_date->diffForHumans(),
-                'table_name' => $data->table_name,
-                'log_type' => $data->log_type,
-                // 'service_id' => $data->service_id,
-                'new_log_details' => $data->new_data,
-                'log_details' => json_encode($data->data),
-                'details' => $data->data,
+                'id' => $log->id,
+                'users' => $log->users,
+                'user_id' => $log->user_id,
+                'username' => $log->user_id,
+                'log_date' => $logDate->format('Y-m-d'),
+                'log_time' => $logDate->format('H:i:s a'),
+                'human_date' => $logDate->diffForHumans(),
+                'table_name' => $log->table_name,
+                'log_type' => $log->log_type,
+                'new_log_details' => $log->new_data,
+                'log_details' => json_encode($log->data),
+                'details' => $log->data,
             ];
         });
-        
-        return response()->json(['data' => $data, 'tables' => $tables, 'services' => ''],200);
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $pagination->currentPage(),
+                'last_page' => $pagination->lastPage(),
+                'per_page' => $pagination->perPage(),
+                'from' => $pagination->firstItem(),
+                'to' => $pagination->lastItem(),
+                'total' => $pagination->total(),
+            ],
+            // 'tables' => $tables,
+            'filters' => [
+                'tables' => $logTables,
+                'users' => $logUsers,
+                'types' => $logTypes,
+            ],
+            'services' => '',
+        ], 200);
     }
 
     

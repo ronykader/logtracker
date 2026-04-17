@@ -11,7 +11,9 @@ class Logtracker extends Model
     protected $table = 'logtrackers';
 
     public $timestamps = false;
-    public $dates = ['log_date'];
+    protected $casts = [
+        'log_date' => 'datetime',
+    ];
     protected $appends = ['dateHumanize','json_data'];
 
     private $userInstance = "\App\Models\User";
