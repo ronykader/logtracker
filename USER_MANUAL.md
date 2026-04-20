@@ -6,13 +6,14 @@ Welcome to the modernized **Logtracker** system. This guide will help you naviga
 
 ## 1. Getting Started
 
-### Accessing the Audit Panel
-The Audit Panel is usually accessible at your application's URL followed by `/audit-panel` (e.g., `https://your-app.com/audit-panel`).
-> [!NOTE]
-> Detailed access is restricted to authorized User IDs configured in the system.
+### Accessing the Suite
+The LogTracker Suite is usually accessible at `/audit-panel`.
+1. **Audit Trail**: View detailed database activity logs.
+2. **Analytics Insights**: Advanced charts and trend analysis.
+3. **System Logs**: Human-readable view of `laravel.log`.
 
-### Language Selection
-You can toggle between **English** and **Bengali** using the language switcher in the top-right corner of the dashboard. All charts, filters, and logs will translate instantly.
+### Sidebar Navigation
+The professional sidebar allows you to switch between views instantly. It can be collapsed using the chevron icon in the top left for a focused workspace.
 
 ---
 
@@ -57,7 +58,15 @@ The detail view provides a side-by-side comparison (where applicable):
 
 ---
 
-## 4. Maintenance (For Administrators)
+## 4. System Logs (New)
+The **System Log Viewer** transforms the raw `laravel.log` file into a high-fidelity diagnostic tool.
+*   **Level Badges**: Errors are highlighted in Red/Rose, Warnings in Amber, and Info in Blue.
+*   **Search and Filter**: Filter logs by level or search by keyword within the message and stack trace.
+*   **Collapsible Stack Traces**: Deep-dive into technical errors without cluttering your view.
+
+---
+
+## 5. Maintenance (For Administrators)
 
 Logtracker is built to be "Lean and Clean."
 
@@ -73,7 +82,7 @@ For high-security environments, logs can be mirrored to a MongoDB instance.
 
 ---
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 | Issue | Potential Solution |
 | :--- | :--- |

@@ -25,6 +25,11 @@ class LogtrackerServiceProvider extends ServiceProvider
             __DIR__ . '/database/migrations' => database_path('migrations'),
         ], ['logtracker', 'logtracker-migrations']);
 
+        // Compiled React assets (app.js + app.css)
+        $this->publishes([
+            __DIR__ . '/../dist' => public_path('vendor/logtracker'),
+        ], ['logtracker', 'logtracker-assets']);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Console\Commands\SyncMongoLogs::class,
