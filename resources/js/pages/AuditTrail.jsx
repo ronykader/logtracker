@@ -320,15 +320,24 @@ function DetailDrawer({ log, onClose }) {
                                         </thead>
                                         <tbody>
                                             {keys.map((key, idx) => {
-                                                const changed = String(oldData[key]) !== String(newData[key]);
+                                                const valOld = oldData[key];
+                                                const valNew = newData[key];
+                                                const changed = String(valOld) !== String(valNew);
+                                                
+                                                const formatVal = (v) => {
+                                                    if (v === null || v === undefined) return <span style={{ color: '#cbd5e1' }}>—</span>;
+                                                    if (typeof v === 'object') return JSON.stringify(v, null, 2);
+                                                    return String(v);
+                                                };
+
                                                 return (
                                                     <tr key={key} style={{ background: changed ? '#fffbf5' : (idx % 2 === 0 ? '#fff' : '#fafafa'), borderBottom: '1px solid #f8fafc' }}>
                                                         <td style={{ padding: '9px 14px', fontWeight: 700, color: '#475569', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{key}</td>
-                                                        <td style={{ padding: '9px 14px', color: '#f43f5e', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(oldData[key] ?? '')}>
-                                                            {String(oldData[key] ?? <span style={{ color: '#cbd5e1' }}>—</span>)}
+                                                        <td style={{ padding: '9px 14px', color: '#f43f5e', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={typeof valOld === 'object' ? JSON.stringify(valOld) : String(valOld)}>
+                                                            {formatVal(valOld)}
                                                         </td>
-                                                        <td style={{ padding: '9px 14px', color: '#059669', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(newData[key] ?? '')}>
-                                                            {String(newData[key] ?? <span style={{ color: '#cbd5e1' }}>—</span>)}
+                                                        <td style={{ padding: '9px 14px', color: '#059669', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={typeof valNew === 'object' ? JSON.stringify(valNew) : String(valNew)}>
+                                                            {formatVal(valNew)}
                                                         </td>
                                                     </tr>
                                                 );
