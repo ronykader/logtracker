@@ -20,9 +20,9 @@ class CreateLogtrackersTable extends Migration
             $table->dateTime('log_date');
             $table->string('table_name',50)->nullable();
             $table->string('log_type',50);
-            $table->longText('new_data')->nullable();
-            $table->longText('data');
-            $table->boolean('synchronous')->default(false);
+            $table->text('new_data')->nullable();
+            $table->text('data')->nullable();
+            $table->boolean('synchronous')->default(0);
             $table->timestamps();
         });
     }

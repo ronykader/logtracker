@@ -13,24 +13,22 @@ class Logtracker extends Model
     public $timestamps = false;
     protected $casts = [
         'log_date' => 'datetime',
+        'data' => 'array',
+        'new_data' => 'array',
     ];
-    protected $appends = ['dateHumanize','json_data'];
+    protected $appends = ['dateHumanize'];
 
     private $userInstance = "\App\Models\User";
 
-    public function __construct() {
-        $userInstance = ''; // Will be dynamic for package
+    public function __construct(array $attributes = []) {
+        parent::__construct($attributes);
+        $userInstance = config('logtracker.user_model', "\App\Models\User");
         if(!empty($userInstance)) $this->userInstance = $userInstance;
     }
 
     public function getDateHumanizeAttribute()
     {
-        return $this->log_date->diffForHumans();
-    }
-
-    public function getJsonDataAttribute()
-    {
-        return json_decode($this->data,true);
+        return $this->log_date ? $this->log_date->diffForHumans() : '—';
     }
 
     public function user()

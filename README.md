@@ -1,103 +1,73 @@
-# Logtracker
+# Logtracker - Modern Audit Logging for Laravel
 
-A comprehensive Laravel package for tracking and auditing user activities and system events in your application.
+A high-performance, internationalized activity log manager for Laravel applications. This package tracks all database activities and provides a premium, animated audit panel.
 
 ## Features
-
-- User activity tracking and logging
-- Audit trail management
-- API token verification for secure logging
-- Easy integration with Laravel applications
-- Blade template audit panel for viewing logs
-- Service provider for seamless setup
-
-## Requirements
-
-- PHP 7.4 or higher
-- Laravel 8.0 or higher
-- Composer
+- **Premium UI**: Glassmorphic, animated dashboard powered by React and Framer Motion.
+- **i18n Ready**: Full support for English and Bengali locales.
+- **Grainular Security**: Access control via User ID whitelisting.
+- **Performance**: Asynchronous logging support via Laravel Queues.
+- **NoSQL Backup**: Background synchronization of logs to MongoDB.
+- **Privacy**: Automatically masks sensitive `$hidden` attributes.
 
 ## Installation
 
-Install the package via Composer:
-
+### Local Development
+Add the path to your `composer.json`:
+```json
+"repositories": [
+    {
+        "type": "path",
+        "url": "./Packages/logtracker"
+    }
+]
+```
+Then run:
 ```bash
-composer require obd/logtracker
+composer require obd/logtracker:dev-master
 ```
 
-## Configuration
+## Setup
+1. **Publish Assets**:
+   ```bash
+   php artisan vendor:publish --tag=logtracker-config --force
+   php artisan vendor:publish --tag=logtracker-views --force
+   ```
 
-After installation, the package will be auto-discovered by Laravel. You can publish the configuration file:
+2. **Run Migrations**:
+   ```bash
+   php artisan migrate
+   ```
 
-```bash
-php artisan vendor:publish --provider="Obd\Logtracker\LogtrackerServiceProvider"
-```
-
-This will publish the configuration file to `config/obd_tracker.php` where you can customize the package settings.
-
-## Usage
-
-### Basic Setup
-
-Add the `Logtrackerable` trait to your models:
-
+3. **Add Trait to Models**:
 ```php
 use Obd\Logtracker\Traits\Logtrackerable;
 
-class User extends Model
-{
+class Project extends Model {
     use Logtrackerable;
-    // ...
 }
 ```
 
-### Viewing the Audit Panel
+## Configuration (.env)
 
-Access the audit panel through the provided route:
-
-```
-/audit-log
-```
-
-### API Integration
-
-Secure your logging endpoints with the `VerifyLogApiToken` middleware:
-
-```php
-Route::post('/log/event', 'LogtrackerController@store')
-    ->middleware('verify.log.api.token');
-```
-
-## Database Migration
-
-Run the migrations to create the necessary database tables:
-
+### Authorization
+By default, the audit panel is restricted. Add allowed User IDs:
 ```bash
-php artisan migrate
+LOGTRACKER_ALLOWED_IDS=1,2,5
 ```
 
-## Events
+### Performance & Features
+```bash
+# Performance
+LOGTRACKER_QUEUE_ENABLED=true
 
-The package includes event listeners for tracking user logins:
+# MongoDB Sync
+LOGTRACKER_MONGO_ENABLED=true
+LOGTRACKER_MONGO_CONNECTION=mongodb
+```
 
-- `LoginListener` - Automatically logs user login events
-
-## API Endpoints
-
-The `LogtrackerController` provides RESTful endpoints for managing logs.
-
-## Configuration Options
-
-Customize the package behavior in `config/obd_tracker.php`:
-
-- API token verification settings
-- Log retention policies
-- Tracked events configuration
-
-## License
-
-This package is proprietary software. All rights reserved.
-
-## Support
-
-For issues, feature requests, or contributions, please contact the development team.
+## Commands
+Synchronize logs to MongoDB:
+```bash
+php artisan logtracker:sync-mongo
+```

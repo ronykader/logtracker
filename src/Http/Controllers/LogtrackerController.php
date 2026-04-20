@@ -13,13 +13,32 @@ class LogtrackerController extends Controller
     /**
      * Display the audit panel UI.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $allowedIds = config('obd_tracker.allowed_user_ids', []);
+        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+            abort(403, 'Unauthorized access to Audit Panel.');
+        }
+
+        if ($request->has('locale')) {
+            session(['logtracker_locale' => $request->get('locale')]);
+            app()->setLocale($request->get('locale'));
+        }
+
+        if (session()->has('logtracker_locale')) {
+            app()->setLocale(session('logtracker_locale'));
+        }
+
         return view('logtracker::auditpanel.index');
     }
 
     public function logApidata(Request $request)
     {
+        $allowedIds = config('obd_tracker.allowed_user_ids', []);
+        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $query = Logtracker::orderBy('id', 'desc');
 
         if ($request->filled('table')) {
@@ -66,15 +85,13 @@ class LogtrackerController extends Controller
                 'id' => $log->id,
                 'users' => $log->users,
                 'user_id' => $log->user_id,
-                'username' => $log->user_id,
                 'log_date' => $logDate->format('Y-m-d'),
                 'log_time' => $logDate->format('H:i:s a'),
-                'human_date' => $logDate->diffForHumans(),
+                'human_date' => $log->dateHumanize,
                 'table_name' => $log->table_name,
                 'log_type' => $log->log_type,
-                'new_log_details' => $log->new_data,
-                'log_details' => json_encode($log->data),
-                'details' => $log->data,
+                'data' => $log->data,
+                'new_data' => $log->new_data,
             ];
         });
 
@@ -88,75 +105,11 @@ class LogtrackerController extends Controller
                 'to' => $pagination->lastItem(),
                 'total' => $pagination->total(),
             ],
-            // 'tables' => $tables,
             'filters' => [
                 'tables' => $logTables,
                 'users' => $logUsers,
                 'types' => $logTypes,
             ],
-            'services' => '',
         ], 200);
     }
-
-    
-    /*************This two method only for Mongo Database************/
-
-    /**
-     * @ TODO
-     * @ Return only unsynchronous data
-     *
-     * @return json
-     */
-    public function getUnsynchronousData()
-    {
-        $synchronous = Logtracker::where('synchronous',0)->get();
-        return response()->json(['data' => $synchronous],200);
-    }
-
-    /**
-     * @ TODO
-     * @ Need to change synchronous field false to true
-     *
-     * @param Request $request
-     * @return string
-     */
-    public function synchronousProcess(Request $request)
-    {
-        DB::table('logtrackers')->where('id',$request->id)->update([
-            'synchronous' => $request->synchronous
-        ]);
-        return response()->json(['message' => 'success'],200);
-    }
-
-
-
-
-
-    /**************Only for Google Analytic Reports***************/
-
-    public function googleAnalyticData()
-    {
-        $analyticsData = Analytics::fetchVisitorsAndPageViews(Period::days(30));
-        
-        $mostVisitedPage = Analytics::fetchMostVisitedPages(Period::days(7));
-        
-        $TopReferrers = Analytics::fetchTopReferrers(Period::days(7));
-        
-        $chart = Analytics::fetchUserTypes(Period::days(7));
-        
-        $chartData = [
-            'NewVisitor' => $chart[0]['sessions'] ?? 1,
-            'ReturningVisitor' => $chart[1]['sessions'] ?? 2
-        ];
-
-        return response()->json(['analyticsData' => $analyticsData, 'mostVisitedPage' => $mostVisitedPage, 'TopReferrers' => $TopReferrers, 'chartData' => $chartData],200);
-
-        return view('auditpanel.analytic-dashboard.index', [
-            'analyticsData' => $analyticsData,
-            'chartData'=>json_encode($chartData),
-            'mostVisitedPage' => $mostVisitedPage,
-            'TopReferrers' => $TopReferrers,
-        ]);
-    }
-
 }

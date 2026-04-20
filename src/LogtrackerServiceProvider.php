@@ -11,6 +11,7 @@ class LogtrackerServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
         $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
         $this->loadViewsFrom(__DIR__ . '/resources/views', 'logtracker');
+        $this->loadTranslationsFrom(__DIR__ . '/resources/lang', 'logtracker');
 
         $this->publishes([
             __DIR__ . '/config/obd_tracker.php' => config_path('obd_tracker.php'),
@@ -23,11 +24,17 @@ class LogtrackerServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/database/migrations' => database_path('migrations'),
         ], ['logtracker', 'logtracker-migrations']);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                Console\Commands\SyncMongoLogs::class,
+            ]);
+        }
     }
 
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . '/config/obd_tracker.php', 'logtracker');
+        $this->mergeConfigFrom(__DIR__ . '/config/obd_tracker.php', 'obd_tracker');
         $this->app->register(EventServiceProvider::class);
     }
     
