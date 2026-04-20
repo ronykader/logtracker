@@ -32,7 +32,6 @@ yarn-error.log
 
 # Build artifacts
 /build/
-/dist/
 
 # OS specific
 .DS_Store
