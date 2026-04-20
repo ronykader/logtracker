@@ -8,6 +8,7 @@ Route::group([
     'middleware' => config('logtracker.api_middleware', ['web', 'auth']),
 ], function () {
     Route::get('/', [LogtrackerController::class,'logApidata']);
+    Route::get('/insights', [LogtrackerController::class, 'getInsights']);
 });
 
 Route::group([

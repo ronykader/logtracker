@@ -13,13 +13,32 @@ class LogtrackerController extends Controller
     /**
      * Display the audit panel UI.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $allowedIds = config('obd_tracker.allowed_user_ids', []);
+        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+            abort(403, 'Unauthorized access to Audit Panel.');
+        }
+
+        if ($request->has('locale')) {
+            session(['logtracker_locale' => $request->get('locale')]);
+            app()->setLocale($request->get('locale'));
+        }
+
+        if (session()->has('logtracker_locale')) {
+            app()->setLocale(session('logtracker_locale'));
+        }
+
         return view('logtracker::auditpanel.index');
     }
 
     public function logApidata(Request $request)
     {
+        $allowedIds = config('obd_tracker.allowed_user_ids', []);
+        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $query = Logtracker::orderBy('id', 'desc');
 
         if ($request->filled('table')) {
@@ -34,13 +53,24 @@ class LogtrackerController extends Controller
             $query->where('users', 'like', '%' . $request->query('user') . '%');
         }
 
+        if ($request->filled('start_date')) {
+            $query->whereDate('log_date', '>=', $request->query('start_date'));
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('log_date', '<=', $request->query('end_date'));
+        }
+
         if ($request->filled('search')) {
             $search = $request->query('search');
             $query->where(function ($subQuery) use ($search) {
                 $subQuery->where('new_data', 'like', '%' . $search . '%')
                     ->orWhere('data', 'like', '%' . $search . '%')
                     ->orWhere('users', 'like', '%' . $search . '%')
-                    ->orWhere('table_name', 'like', '%' . $search . '%');
+                    ->orWhere('table_name', 'like', '%' . $search . '%')
+                    ->orWhere('ip_address', 'like', '%' . $search . '%')
+                    ->orWhere('url', 'like', '%' . $search . '%')
+                    ->orWhere('route_name', 'like', '%' . $search . '%');
             });
         }
 
@@ -56,7 +86,7 @@ class LogtrackerController extends Controller
         $logTypes = $filterQuery->select('log_type')->distinct()->pluck('log_type')->filter()->values();
 
         $pagination = $query->select([
-            'id', 'users', 'user_id', 'log_date', 'table_name', 'log_type', 'new_data', 'data'
+            'id', 'users', 'user_id', 'log_date', 'table_name', 'log_type', 'new_data', 'data', 'ip_address', 'user_agent', 'url', 'route_name'
         ])->paginate($perPage)->appends($request->query());
 
         $data = $pagination->getCollection()->map(function ($log) {
@@ -66,15 +96,17 @@ class LogtrackerController extends Controller
                 'id' => $log->id,
                 'users' => $log->users,
                 'user_id' => $log->user_id,
-                'username' => $log->user_id,
                 'log_date' => $logDate->format('Y-m-d'),
                 'log_time' => $logDate->format('H:i:s a'),
-                'human_date' => $logDate->diffForHumans(),
+                'human_date' => $log->dateHumanize,
                 'table_name' => $log->table_name,
                 'log_type' => $log->log_type,
-                'new_log_details' => $log->new_data,
-                'log_details' => json_encode($log->data),
-                'details' => $log->data,
+                'data' => $log->data,
+                'new_data' => $log->new_data,
+                'ip_address' => $log->ip_address,
+                'user_agent' => $log->user_agent,
+                'url' => $log->url,
+                'route_name' => $log->route_name,
             ];
         });
 
@@ -88,75 +120,67 @@ class LogtrackerController extends Controller
                 'to' => $pagination->lastItem(),
                 'total' => $pagination->total(),
             ],
-            // 'tables' => $tables,
             'filters' => [
                 'tables' => $logTables,
                 'users' => $logUsers,
                 'types' => $logTypes,
             ],
-            'services' => '',
         ], 200);
     }
 
-    
-    /*************This two method only for Mongo Database************/
-
-    /**
-     * @ TODO
-     * @ Return only unsynchronous data
-     *
-     * @return json
-     */
-    public function getUnsynchronousData()
+    public function getInsights(Request $request)
     {
-        $synchronous = Logtracker::where('synchronous',0)->get();
-        return response()->json(['data' => $synchronous],200);
-    }
+        $allowedIds = config('obd_tracker.allowed_user_ids', []);
+        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
-    /**
-     * @ TODO
-     * @ Need to change synchronous field false to true
-     *
-     * @param Request $request
-     * @return string
-     */
-    public function synchronousProcess(Request $request)
-    {
-        DB::table('logtrackers')->where('id',$request->id)->update([
-            'synchronous' => $request->synchronous
-        ]);
-        return response()->json(['message' => 'success'],200);
-    }
+        $query = Logtracker::query();
 
+        if ($request->filled('start_date')) {
+            $query->whereDate('log_date', '>=', $request->query('start_date'));
+        }
 
+        if ($request->filled('end_date')) {
+            $query->whereDate('log_date', '<=', $request->query('end_date'));
+        }
 
+        // Top 5 Modified Tables
+        $topTables = (clone $query)->select('table_name', \DB::raw('count(*) as count'))
+            ->groupBy('table_name')
+            ->orderBy('count', 'desc')
+            ->limit(5)
+            ->get();
 
+        // Top 5 Active Users
+        $topUsers = (clone $query)->select(\DB::raw('MAX(users) as users'), 'user_id', \DB::raw('count(*) as count'))
+            ->groupBy('user_id')
+            ->orderBy('count', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function($log) {
+                $userData = json_decode($log->users, true) ?? [];
+                return [
+                    'name' => $userData['name'] ?? 'User #'.$log->user_id,
+                    'count' => $log->count
+                ];
+            });
 
-    /**************Only for Google Analytic Reports***************/
-
-    public function googleAnalyticData()
-    {
-        $analyticsData = Analytics::fetchVisitorsAndPageViews(Period::days(30));
+        // Activity Timeline (Last 14 Days OR Range)
+        $timelineQuery = (clone $query)->select(\DB::raw('DATE(log_date) as date'), \DB::raw('count(*) as count'));
         
-        $mostVisitedPage = Analytics::fetchMostVisitedPages(Period::days(7));
-        
-        $TopReferrers = Analytics::fetchTopReferrers(Period::days(7));
-        
-        $chart = Analytics::fetchUserTypes(Period::days(7));
-        
-        $chartData = [
-            'NewVisitor' => $chart[0]['sessions'] ?? 1,
-            'ReturningVisitor' => $chart[1]['sessions'] ?? 2
-        ];
+        if (!$request->filled('start_date')) {
+            $timelineQuery->where('log_date', '>=', now()->subDays(14));
+        }
 
-        return response()->json(['analyticsData' => $analyticsData, 'mostVisitedPage' => $mostVisitedPage, 'TopReferrers' => $TopReferrers, 'chartData' => $chartData],200);
+        $activity = $timelineQuery->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get();
 
-        return view('auditpanel.analytic-dashboard.index', [
-            'analyticsData' => $analyticsData,
-            'chartData'=>json_encode($chartData),
-            'mostVisitedPage' => $mostVisitedPage,
-            'TopReferrers' => $TopReferrers,
+        return response()->json([
+            'top_tables' => $topTables,
+            'top_users' => $topUsers,
+            'activity' => $activity
         ]);
     }
-
 }
