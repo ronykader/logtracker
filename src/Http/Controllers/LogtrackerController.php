@@ -68,7 +68,9 @@ class LogtrackerController extends Controller
                     ->orWhere('data', 'like', '%' . $search . '%')
                     ->orWhere('users', 'like', '%' . $search . '%')
                     ->orWhere('table_name', 'like', '%' . $search . '%')
-                    ->orWhere('ip_address', 'like', '%' . $search . '%');
+                    ->orWhere('ip_address', 'like', '%' . $search . '%')
+                    ->orWhere('url', 'like', '%' . $search . '%')
+                    ->orWhere('route_name', 'like', '%' . $search . '%');
             });
         }
 
@@ -84,7 +86,7 @@ class LogtrackerController extends Controller
         $logTypes = $filterQuery->select('log_type')->distinct()->pluck('log_type')->filter()->values();
 
         $pagination = $query->select([
-            'id', 'users', 'user_id', 'log_date', 'table_name', 'log_type', 'new_data', 'data'
+            'id', 'users', 'user_id', 'log_date', 'table_name', 'log_type', 'new_data', 'data', 'ip_address', 'user_agent', 'url', 'route_name'
         ])->paginate($perPage)->appends($request->query());
 
         $data = $pagination->getCollection()->map(function ($log) {
@@ -101,6 +103,10 @@ class LogtrackerController extends Controller
                 'log_type' => $log->log_type,
                 'data' => $log->data,
                 'new_data' => $log->new_data,
+                'ip_address' => $log->ip_address,
+                'user_agent' => $log->user_agent,
+                'url' => $log->url,
+                'route_name' => $log->route_name,
             ];
         });
 

@@ -135,6 +135,7 @@
                 table: "{{ __('logtracker::ui.filter_label_table') }}",
                 type: "{{ __('logtracker::ui.filter_label_type') }}",
                 search: "{{ __('logtracker::ui.filter_label_search') }}",
+                searchPlaceholder: "{{ __('logtracker::ui.filter_placeholder_search') }}",
                 pageSize: "{{ __('logtracker::ui.filter_label_page_size') }}",
                 allTables: "{{ __('logtracker::ui.all_tables') }}",
                 allTypes: "{{ __('logtracker::ui.all_types') }}",
@@ -146,7 +147,9 @@
                 close: "{{ __('logtracker::ui.details_modal_close') }}",
                 field: "{{ __('logtracker::ui.details_field_label') }}",
                 old: "{{ __('logtracker::ui.details_old_value') }}",
-                new: "{{ __('logtracker::ui.details_new_value') }}"
+                new: "{{ __('logtracker::ui.details_new_value') }}",
+                url: "{{ __('logtracker::ui.details_url') }}",
+                route: "{{ __('logtracker::ui.details_route') }}"
             },
             types: {
                 create: "{{ __('logtracker::ui.log_type_create') }}",
@@ -434,7 +437,21 @@
                         className="glass-card rounded-2xl p-6 mb-8"
                     >
                         <form onSubmit={executeSearch} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{i18n.filters.search}</label>
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            name="search" 
+                                            value={params.search} 
+                                            onChange={handleFilterChange} 
+                                            placeholder={i18n.filters.searchPlaceholder}
+                                            className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all"
+                                        />
+                                        <svg className="absolute left-3 top-3.5 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                    </div>
+                                </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{i18n.filters.table}</label>
                                     <select name="table" value={params.table} onChange={handleFilterChange} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all">
