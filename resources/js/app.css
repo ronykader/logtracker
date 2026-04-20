@@ -1,0 +1,77 @@
+/* ── LogTracker Suite — Base Styles ── */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #logtracker-root {
+    height: 100%;
+    width: 100%;
+    font-family: 'Outfit', sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+    overflow: hidden;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Animations ── */
+@keyframes shimmer {
+    from { background-position: -600px 0; }
+    to { background-position: 600px 0; }
+}
+.shimmer {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 600px 100%;
+    animation: shimmer 1.6s ease infinite;
+    border-radius: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.spin { animation: spin 1s linear infinite; }
+
+/* ── Monospace (System Logs) ── */
+.mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+/* ── Flatpickr Overrides ── */
+.flatpickr-calendar {
+    font-family: 'Outfit', sans-serif !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12) !important;
+    border: 1px solid #e2e8f0 !important;
+}
+.flatpickr-day.selected, .flatpickr-day.selected:hover {
+    background: #6366f1 !important;
+    border-color: #6366f1 !important;
+}
+.flatpickr-day.inRange {
+    background: #eef2ff !important;
+    border-color: #eef2ff !important;
+    box-shadow: none !important;
+}
+.flatpickr-months .flatpickr-month { color: #1e293b !important; }
+
+/* ── Table Row Hover ── */
+.lt-row { transition: background 0.12s ease; cursor: pointer; }
+.lt-row:hover { background: #eef2ff !important; }
+
+/* ── Card base ── */
+.lt-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* ── Sidebar nav item active glow ── */
+.lt-nav-active {
+    background: rgba(99, 102, 241, 0.2) !important;
+    border-color: rgba(99, 102, 241, 0.35) !important;
+    color: #ffffff !important;
+}
