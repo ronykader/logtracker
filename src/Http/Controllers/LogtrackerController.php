@@ -53,13 +53,22 @@ class LogtrackerController extends Controller
             $query->where('users', 'like', '%' . $request->query('user') . '%');
         }
 
+        if ($request->filled('start_date')) {
+            $query->whereDate('log_date', '>=', $request->query('start_date'));
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('log_date', '<=', $request->query('end_date'));
+        }
+
         if ($request->filled('search')) {
             $search = $request->query('search');
             $query->where(function ($subQuery) use ($search) {
                 $subQuery->where('new_data', 'like', '%' . $search . '%')
                     ->orWhere('data', 'like', '%' . $search . '%')
                     ->orWhere('users', 'like', '%' . $search . '%')
-                    ->orWhere('table_name', 'like', '%' . $search . '%');
+                    ->orWhere('table_name', 'like', '%' . $search . '%')
+                    ->orWhere('ip_address', 'like', '%' . $search . '%');
             });
         }
 
@@ -111,5 +120,61 @@ class LogtrackerController extends Controller
                 'types' => $logTypes,
             ],
         ], 200);
+    }
+
+    public function getInsights(Request $request)
+    {
+        $allowedIds = config('obd_tracker.allowed_user_ids', []);
+        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = Logtracker::query();
+
+        if ($request->filled('start_date')) {
+            $query->whereDate('log_date', '>=', $request->query('start_date'));
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('log_date', '<=', $request->query('end_date'));
+        }
+
+        // Top 5 Modified Tables
+        $topTables = (clone $query)->select('table_name', \DB::raw('count(*) as count'))
+            ->groupBy('table_name')
+            ->orderBy('count', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Top 5 Active Users
+        $topUsers = (clone $query)->select(\DB::raw('MAX(users) as users'), 'user_id', \DB::raw('count(*) as count'))
+            ->groupBy('user_id')
+            ->orderBy('count', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function($log) {
+                $userData = json_decode($log->users, true) ?? [];
+                return [
+                    'name' => $userData['name'] ?? 'User #'.$log->user_id,
+                    'count' => $log->count
+                ];
+            });
+
+        // Activity Timeline (Last 14 Days OR Range)
+        $timelineQuery = (clone $query)->select(\DB::raw('DATE(log_date) as date'), \DB::raw('count(*) as count'));
+        
+        if (!$request->filled('start_date')) {
+            $timelineQuery->where('log_date', '>=', now()->subDays(14));
+        }
+
+        $activity = $timelineQuery->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get();
+
+        return response()->json([
+            'top_tables' => $topTables,
+            'top_users' => $topUsers,
+            'activity' => $activity
+        ]);
     }
 }

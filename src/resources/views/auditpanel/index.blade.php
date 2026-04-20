@@ -19,6 +19,20 @@
     <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide-icons/0.279.0/umd/lucide.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
+    <!-- Flatpickr for premium Date Picking -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        .flatpickr-calendar {
+            background: rgba(255, 255, 255, 0.9) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 12px !important;
+        }
+    </style>
     <script>
         // Pre-check for Babel
         console.log("Babel system ready.");
@@ -162,7 +176,7 @@
         function AuditPanel() {
             const [logs, setLogs] = useState([]);
             const [filters, setFilters] = useState({ tables: [], users: [], types: [] });
-            const [params, setParams] = useState({ table: '', type: '', search: '' });
+            const [params, setParams] = useState({ table: '', type: '', search: '', start_date: '', end_date: '' });
             const [page, setPage] = useState(1);
             const [pageSize, setPageSize] = useState(10);
             const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
@@ -170,18 +184,106 @@
             const [isMaximized, setIsMaximized] = useState(false);
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [loading, setLoading] = useState(true);
+            const [showInsights, setShowInsights] = useState(false);
+            const [insights, setInsights] = useState({ top_tables: [], top_users: [], activity: [] });
 
             useEffect(() => {
                 loadLogs();
+                loadInsights();
             }, [page, pageSize]);
+
+            useEffect(() => {
+                if (showInsights && insights.top_tables.length > 0) {
+                    renderCharts();
+                }
+            }, [showInsights, insights]);
+
+            const renderCharts = () => {
+                // Table Distribution Donut
+                const tableOptions = {
+                    series: insights.top_tables.map(t => t.count),
+                    labels: insights.top_tables.map(t => t.table_name),
+                    chart: { type: 'donut', height: 220 },
+                    colors: ['#3d67f7', '#7795f9', '#ced9fd', '#b1c2fc', '#f5f7ff'],
+                    dataLabels: { enabled: false },
+                    legend: { position: 'bottom', fontSize: '10px', fontWeight: 600 }
+                };
+                new ApexCharts(document.querySelector("#chart-tables-pie"), tableOptions).render();
+
+                // Activity Area Chart
+                const activityOptions = {
+                    series: [{ name: 'Logs', data: insights.activity.map(a => a.count) }],
+                    chart: { type: 'area', height: 200, toolbar: { show: false }, zoom: { enabled: false } },
+                    colors: ['#10b981'],
+                    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1 } },
+                    dataLabels: { enabled: false },
+                    stroke: { curve: 'smooth', width: 3 },
+                    xaxis: { categories: insights.activity.map(a => a.date.split('-').slice(1).join('/')), labels: { style: { fontSize: '9px', fontWeight: 600 } } },
+                    yaxis: { show: false }
+                };
+                new ApexCharts(document.querySelector("#chart-activity-area"), activityOptions).render();
+            };
+
+            useEffect(() => {
+                flatpickr(".datepicker-input", {
+                    mode: "range",
+                    dateFormat: "Y-m-d",
+                    animate: true,
+                    onClose: (selectedDates) => {
+                        if (selectedDates.length === 2) {
+                            setParams(prev => ({
+                                ...prev,
+                                start_date: selectedDates[0].toISOString().split('T')[0],
+                                end_date: selectedDates[1].toISOString().split('T')[0]
+                            }));
+                        } else if (selectedDates.length === 0) {
+                            setParams(prev => ({ ...prev, start_date: '', end_date: '' }));
+                        }
+                    }
+                });
+            }, []);
+
+            const loadInsights = (overrideParams = {}) => {
+                const queryParams = new URLSearchParams({
+                    ...params,
+                    ...overrideParams
+                });
+                fetch("{{ url(config('logtracker.api_prefix', 'api/audit-panel-data')) }}/insights?" + queryParams.toString())
+                    .then(r => r.json())
+                    .then(json => setInsights(json));
+            };
+
+            const exportToCSV = () => {
+                const headers = ['Date', 'Time', 'User ID', 'Table', 'Type', 'Data'];
+                const rows = logs.map(l => [
+                    l.log_date,
+                    l.log_time,
+                    l.user_id,
+                    l.table_name,
+                    l.log_type,
+                    JSON.stringify(l.data).replace(/"/g, '""')
+                ]);
+                
+                let csvContent = "data:text/csv;charset=utf-8," 
+                    + headers.join(",") + "\n"
+                    + rows.map(e => e.join(",")).join("\n");
+                
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `audit_log_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
 
             const loadLogs = (overrideParams = {}) => {
                 setLoading(true);
+                const currentParams = { ...params, ...overrideParams };
                 const queryParams = new URLSearchParams({
                     page,
                     per_page: pageSize,
-                    ...params,
-                    ...overrideParams
+                    ...currentParams
                 });
 
                 fetch("{{ url(config('logtracker.api_prefix', 'api/audit-panel-data')) }}?" + queryParams.toString())
@@ -192,6 +294,9 @@
                         setMeta(json.meta || meta);
                         setLoading(false);
                     });
+                
+                // Keep insights in sync with the same filters
+                loadInsights(overrideParams);
             };
 
             const handleFilterChange = (e) => {
@@ -206,7 +311,7 @@
             };
 
             const resetFilters = () => {
-                const defaults = { table: '', type: '', search: '' };
+                const defaults = { table: '', type: '', search: '', start_date: '', end_date: '' };
                 setParams(defaults);
                 setPage(1);
                 loadLogs({ ...defaults, page: 1 });
@@ -274,6 +379,53 @@
                         </div>
                     </motion.div>
 
+                    {/* Insights Section */}
+                    <div className="mb-6">
+                        <button 
+                            onClick={() => setShowInsights(!showInsights)}
+                            className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-[0.2em] hover:text-primary-600 transition-colors mb-4"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m19 9-7 7-7-7"/></svg>
+                            {showInsights ? 'Hide Insights' : 'Show Visual Insights'}
+                        </button>
+                        
+                        <AnimatePresence>
+                            {showInsights && (
+                                <motion.div 
+                                    initial=@{{ opacity: 0, height: 0 }}
+                                    animate=@{{ opacity: 1, height: 'auto' }}
+                                    exit=@{{ opacity: 0, height: 0 }}
+                                    className="grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden pb-4"
+                                >
+                                    <div className="glass-card rounded-2xl p-6">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Table Distribution</h3>
+                                        <div id="chart-tables-pie" className="h-[220px]"></div>
+                                    </div>
+
+                                    <div className="glass-card rounded-2xl p-6">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Active Contributors</h3>
+                                        <div className="space-y-4">
+                                            {insights.top_users.slice(0, 5).map((u, i) => (
+                                                <div key={i} className="flex items-center justify-between group p-2 hover:bg-slate-50 rounded-xl transition-all">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center text-[10px] font-black text-primary-700">{u.count}</div>
+                                                        <div className="text-xs font-bold text-slate-700">{u.name}</div>
+                                                    </div>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-200 group-hover:bg-primary-500"></div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-card rounded-2xl p-6">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Activity Velocity</h3>
+                                        <div id="chart-activity-area" className="h-[200px]"></div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
                     {/* Filter Card */}
                     <motion.div 
                         initial=@{{ opacity: 0, y: 20 }}
@@ -281,44 +433,67 @@
                         transition=@{{ delay: 0.1 }}
                         className="glass-card rounded-2xl p-6 mb-8"
                     >
-                        <form onSubmit={executeSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{i18n.filters.table}</label>
-                                <select name="table" value={params.table} onChange={handleFilterChange} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all">
-                                    <option value="">{i18n.filters.allTables}</option>
-                                    {filters.tables.map(t => <option value={t}>{t}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{i18n.filters.type}</label>
-                                <select name="type" value={params.type} onChange={handleFilterChange} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all">
-                                    <option value="">{i18n.filters.allTypes}</option>
-                                    {filters.types.map(t => <option value={t}>{t}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-2 lg:col-span-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{i18n.filters.search}</label>
-                                <div className="relative">
-                                    <input 
-                                        name="search" 
-                                        type="text" 
-                                        value={params.search} 
-                                        onChange={handleFilterChange}
-                                        placeholder="Search by ID or content..." 
-                                        className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all"
-                                    />
-                                    <span className="absolute left-3 top-3.5 text-slate-400">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                                    </span>
+                        <form onSubmit={executeSearch} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{i18n.filters.table}</label>
+                                    <select name="table" value={params.table} onChange={handleFilterChange} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all">
+                                        <option value="">{i18n.filters.allTables}</option>
+                                        {filters.tables.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{i18n.filters.type}</label>
+                                    <select name="type" value={params.type} onChange={handleFilterChange} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all">
+                                        <option value="">{i18n.filters.allTypes}</option>
+                                        {filters.types.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Global Search</label>
+                                    <div className="relative">
+                                        <input 
+                                            name="search" 
+                                            type="text" 
+                                            value={params.search} 
+                                            onChange={handleFilterChange}
+                                            placeholder="Search by ID or content..." 
+                                            className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-primary-400 outline-none transition-all"
+                                        />
+                                        <span className="absolute left-3 top-3.5 text-slate-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex gap-2">
-                                <button type="submit" className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-primary-200">
-                                    {i18n.filters.refresh}
-                                </button>
-                                <button type="button" onClick={resetFilters} className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-3 rounded-xl transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-rotate-ccw"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                                </button>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                                <div className="lg:col-span-2 space-y-2">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Selected Period</label>
+                                    <div className="relative group">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Pick range..."
+                                            value={params.start_date ? `${params.start_date} → ${params.end_date}` : ''}
+                                            readOnly
+                                            className="datepicker-input w-full bg-slate-50 border-none rounded-xl pl-12 pr-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-primary-400 outline-none transition-all cursor-pointer group-hover:bg-slate-100"
+                                        />
+                                        <span className="absolute left-4 top-3 text-primary-500 pointer-events-none group-hover:scale-110 transition-transform">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="lg:col-span-2 flex gap-2">
+                                    <button type="submit" className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-primary-200">
+                                        Apply Filters
+                                    </button>
+                                    <button type="button" onClick={exportToCSV} title="Export CSV" className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl transition-all shadow-lg shadow-emerald-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                    </button>
+                                    <button type="button" onClick={resetFilters} className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-3 rounded-xl transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </motion.div>
@@ -417,6 +592,55 @@
                         </div>
                     </motion.div>
 
+                    {/* Activity Heatmap Grid */}
+                    <motion.div 
+                        initial=@{{ opacity: 0 }}
+                        animate=@{{ opacity: 1 }}
+                        transition=@{{ delay: 0.3 }}
+                        className="glass-card rounded-2xl p-6 mt-8"
+                    >
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">30-Day Activity Heatmap</h3>
+                            <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-400">
+                                <span>LESS</span>
+                                <div className="flex gap-1">
+                                    <div className="w-2.5 h-2.5 rounded-sm bg-slate-100"></div>
+                                    <div className="w-2.5 h-2.5 rounded-sm bg-emerald-200"></div>
+                                    <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400"></div>
+                                    <div className="w-2.5 h-2.5 rounded-sm bg-emerald-600"></div>
+                                </div>
+                                <span>MORE</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 pb-2">
+                            {Array(30).fill(0).map((_, i) => {
+                                const date = new Date();
+                                date.setDate(date.getDate() - (29 - i));
+                                const dateStr = date.toISOString().split('T')[0];
+                                const dayData = (insights.activity || []).find(a => a.date === dateStr);
+                                const count = dayData ? dayData.count : 0;
+                                
+                                let color = 'bg-slate-100';
+                                if (count > 0) color = 'bg-emerald-200 ring-1 ring-emerald-300';
+                                if (count > 5) color = 'bg-emerald-400 ring-1 ring-emerald-500';
+                                if (count > 20) color = 'bg-emerald-600 shadow-md ring-1 ring-emerald-700';
+                                
+                                return (
+                                    <div 
+                                        key={i} 
+                                        title={`${dateStr}: ${count} logs`}
+                                        className={`w-4 h-4 rounded-[3px] ${color} transition-all duration-300 hover:scale-150 cursor-help hover:z-20`}
+                                    ></div>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-4 flex justify-between text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+                            <span>30 Days Ago</span>
+                            <span>Today</span>
+                        </div>
+                    </motion.div>
+
                     {/* Detail Modal Overlay */}
                     <AnimatePresence>
                         {isModalOpen && (
@@ -475,6 +699,34 @@
                                             <div className="text-right">
                                                 <div className="text-lg font-bold text-slate-900">{selectedLog.log_date}</div>
                                                 <div className="text-xs font-bold text-slate-400 uppercase">{selectedLog.log_time}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 mb-8">
+                                            <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                                                <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">IP Address</div>
+                                                <div className="text-sm font-black text-indigo-700">{selectedLog.ip_address || '0.0.0.0'}</div>
+                                            </div>
+                                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">User Agent</div>
+                                                <div className="text-[10px] font-bold text-slate-600 truncate" title={selectedLog.user_agent}>
+                                                    {selectedLog.user_agent || 'Unknown Browser'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 mb-8">
+                                            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 overflow-hidden">
+                                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{i18n.details.url}</div>
+                                                <div className="text-[10px] font-bold text-emerald-700 truncate" title={selectedLog.url}>
+                                                    {selectedLog.url || 'N/A'}
+                                                </div>
+                                            </div>
+                                            <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 overflow-hidden">
+                                                <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">{i18n.details.route}</div>
+                                                <div className="text-[10px] font-bold text-amber-700 truncate" title={selectedLog.route_name}>
+                                                    {selectedLog.route_name || 'N/A'}
+                                                </div>
                                             </div>
                                         </div>
 

@@ -28,6 +28,7 @@ class LogtrackerServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Console\Commands\SyncMongoLogs::class,
+                Console\Commands\PruneLogsCommand::class,
             ]);
         }
     }

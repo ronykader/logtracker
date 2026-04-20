@@ -30,6 +30,12 @@ class LogTrackerJob implements ShouldQueue
      */
     public function handle()
     {
-        DB::table(config('logtracker.table', 'logtrackers'))->insert($this->logData);
+        try {
+            DB::table(config('obd_tracker.table', 'logtrackers'))->insert($this->logData);
+        } catch (\Exception $e) {
+            \Log::error("LogTrackerJob Failed: " . $e->getMessage(), [
+                'log_data' => $this->logData
+            ]);
+        }
     }
 }

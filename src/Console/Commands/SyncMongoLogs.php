@@ -27,53 +27,61 @@ class SyncMongoLogs extends Command
      */
     public function handle()
     {
-        $enabled = config('logtracker.mongodb.enabled', false);
+        $enabled = config('obd_tracker.mongodb.enabled', false);
         if (!$enabled) {
             $this->warn('MongoDB synchronization is disabled in config/obd_tracker.php');
             return;
         }
 
-        $batchSize = config('logtracker.mongodb.batch_size', 100);
-        $connection = config('logtracker.mongodb.connection', 'mongodb');
-        $collectionName = config('logtracker.mongodb.collection', 'audit_logs');
-        $prune = config('logtracker.mongodb.prune_after_sync', false);
+        $batchSize = config('obd_tracker.mongodb.batch_size', 100);
+        $connection = config('obd_tracker.mongodb.connection', 'mongodb');
+        $collectionName = config('obd_tracker.mongodb.collection', 'audit_logs');
+        $prune = config('obd_tracker.mongodb.prune_after_sync', false);
 
-        $logs = Logtracker::where('synchronous', 0)->take($batchSize)->get();
-
-        if ($logs->isEmpty()) {
-            $this->info('No new logs to synchronize.');
-            return;
-        }
+        $totalSynced = 0;
+        $this->info("Starting MongoDB synchronization...");
 
         try {
             $mongoCollection = DB::connection($connection)->table($collectionName);
-            
-            $this->info("Syncing {$logs->count()} logs to MongoDB...");
 
-            $dataToInsert = $logs->map(function ($log) {
-                $data = $log->toArray();
-                // Ensure ID is treated correctly for Mongo if needed
-                $data['sql_id'] = $data['id'];
-                unset($data['id']);
+            while (true) {
+                $logs = Logtracker::where('synchronous', 0)->take($batchSize)->get();
                 
-                // Parse JSON fields so they are stored as objects in Mongo
-                $data['users'] = json_decode($data['users'], true);
-                $data['data'] = json_decode($data['data'], true);
-                $data['new_data'] = json_decode($data['new_data'], true);
+                if ($logs->isEmpty()) {
+                    break;
+                }
+
+                $dataToInsert = $logs->map(function ($log) {
+                    $data = $log->toArray();
+                    $data['sql_id'] = $data['id'];
+                    unset($data['id']);
+                    
+                    // Parse JSON fields safely
+                    $data['users'] = is_string($data['users']) ? json_decode($data['users'], true) : $data['users'];
+                    $data['data'] = is_string($data['data']) ? json_decode($data['data'], true) : $data['data'];
+                    $data['new_data'] = is_string($data['new_data']) ? json_decode($data['new_data'], true) : $data['new_data'];
+                    
+                    return $data;
+                })->toArray();
+
+                $mongoCollection->insert($dataToInsert);
+
+                $ids = $logs->pluck('id');
                 
-                return $data;
-            })->toArray();
+                if ($prune) {
+                    Logtracker::whereIn('id', $ids)->delete();
+                } else {
+                    Logtracker::whereIn('id', $ids)->update(['synchronous' => 1]);
+                }
 
-            $mongoCollection->insert($dataToInsert);
+                $totalSynced += $logs->count();
+                $this->comment("Synced {$totalSynced} logs...");
+            }
 
-            $ids = $logs->pluck('id');
-            
-            if ($prune) {
-                Logtracker::whereIn('id', $ids)->delete();
-                $this->info('Logs synchronized and pruned from SQL.');
+            if ($totalSynced > 0) {
+                $this->info("Successfully synchronized {$totalSynced} logs to MongoDB.");
             } else {
-                Logtracker::whereIn('id', $ids)->update(['synchronous' => 1]);
-                $this->info('Logs synchronized and marked in SQL.');
+                $this->info("No new logs found to synchronize.");
             }
 
         } catch (\Exception $e) {

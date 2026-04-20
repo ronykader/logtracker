@@ -45,4 +45,14 @@ return [
     | If empty, any authenticated user can access.
     */
     'allowed_user_ids' => env('LOGTRACKER_ALLOWED_IDS') ? explode(',', env('LOGTRACKER_ALLOWED_IDS')) : [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Data Retention
+    |--------------------------------------------------------------------------
+    | The number of days to keep logs before they are considered stale.
+    | The `php artisan logtracker:prune` command uses this value.
+    |
+    */
+    'retention_days' => env('LOGTRACKER_RETENTION_DAYS', 90),
 ];

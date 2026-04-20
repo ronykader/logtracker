@@ -3,10 +3,10 @@
 A high-performance, internationalized activity log manager for Laravel applications. This package tracks all database activities and provides a premium, animated audit panel.
 
 ## Features
-- **Premium UI**: Glassmorphic, animated dashboard powered by React and Framer Motion.
+- **Premium UI**: Glassmorphic, React-powered dashboard with **30-Day Activity Heatmaps** and interactive **Date Range Picker**.
 - **i18n Ready**: Full support for English and Bengali locales.
-- **Grainular Security**: Access control via User ID whitelisting.
-- **Performance**: Asynchronous logging support via Laravel Queues.
+- **Granular Security**: Access control via User ID whitelisting.
+- **Performance**: Asynchronous logging support via Laravel Queues and **Optimized Batch Pruning**.
 - **NoSQL Backup**: Background synchronization of logs to MongoDB.
 - **Privacy**: Automatically masks sensitive `$hidden` attributes.
 
@@ -64,10 +64,29 @@ LOGTRACKER_QUEUE_ENABLED=true
 # MongoDB Sync
 LOGTRACKER_MONGO_ENABLED=true
 LOGTRACKER_MONGO_CONNECTION=mongodb
+
+# Data Retention
+LOGTRACKER_RETENTION_DAYS=90
 ```
 
 ## Commands
-Synchronize logs to MongoDB:
+### Synchronize logs to MongoDB:
 ```bash
 php artisan logtracker:sync-mongo
+```
+
+### Prune Stale Logs:
+Keep your database lean by removing logs older than the configured retention period:
+```bash
+php artisan logtracker:prune
+
+# Or override the default retention
+php artisan logtracker:prune --days=30
+```
+
+### Automated Maintenance
+It is highly recommended to schedule the pruning command in your application's Task Scheduler (`routes/console.php` or `app/Console/Kernel.php`):
+
+```php
+$schedule->command('logtracker:prune')->daily();
 ```

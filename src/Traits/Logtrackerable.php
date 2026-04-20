@@ -92,7 +92,11 @@ trait Logtrackerable
             'log_type'    => $logType,
             'new_data'    => $newData,
             'data'        => $formattedOriginal,
-            'synchronous' => 0, // Flag for future MongoDB synchronization
+            'ip_address'  => request()->ip(),
+            'user_agent'  => request()->userAgent(),
+            'url'         => request()->fullUrl(),
+            'route_name'  => request()->route() ? request()->route()->getName() : null,
+            'synchronous' => 0,
         ];
 
         // Check if queued logging is enabled
