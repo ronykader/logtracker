@@ -34,6 +34,7 @@ class LogtrackerServiceProvider extends ServiceProvider
             $this->commands([
                 Console\Commands\SyncMongoLogs::class,
                 Console\Commands\PruneLogsCommand::class,
+                Console\Commands\InstallLogtrackerTraitCommand::class,
             ]);
         }
     }
