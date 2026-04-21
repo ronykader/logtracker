@@ -15,39 +15,43 @@ class LoginListener
 
     public function handle(Login $event)
     {
-        $user = $event->user;
+        $user     = $event->user;
         $dateTime = date('Y-m-d H:i:s');
 
-
-        /*****Arrange user's object from session****/ 
-        // $user_array = [
-        //     'id' => $userInfo['id'],
-        //     'name' => $userInfo['userName'],
-        //     'designation' => $userInfo['designation'],
-        //     'officeNameEng' => $userInfo['officeNameEng'],
-        //     'officeNameBng' => $userInfo['officeNameBng']
-        // ];
-        
+        // Resolve User Metadata (designation, office, etc.)
         $user_array = [
-            'id' => auth()->user()->id,
-            'name' => auth()->user()->name,
-            'designation' => auth()->user()->designation ?? '',
-            'officeNameEng' => auth()->user()->officeNameEng ?? '',
-            'officeNameBng' => auth()->user()->officeNameBng ?? ''
+            'id'    => $user->id,
+            'name'  => $user->name,
+            'email' => $user->email ?? '',
         ];
+        
+        $optionalFields = ['designation', 'officeNameEng', 'officeNameBng'];
+        foreach ($optionalFields as $field) {
+            if (isset($user->$field)) {
+                $user_array[$field] = $user->$field;
+            }
+        }
+        
         $userInfo = json_encode($user_array);
 
-        $data = [
-            'ip'         => $this->request->ip(),
-            'user_agent' => $this->request->userAgent()
+        // Capture Request Metadata
+        $logData = [
+            'users'       => $userInfo,
+            'user_id'     => $user->id,
+            'log_date'    => $dateTime,
+            'table_name'  => 'users',
+            'log_type'    => 'login',
+            'data'        => json_encode([
+                'ip_address' => $this->request->ip(),
+                'user_agent' => $this->request->userAgent()
+            ]),
+            'ip_address'  => $this->request->ip(),
+            'user_agent'  => $this->request->userAgent(),
+            'url'         => $this->request->fullUrl(),
+            'route_name'  => $this->request->route() ? $this->request->route()->getName() : null,
+            'synchronous' => 0,
         ];
-        DB::table('logtrackers')->insert([
-            'users'      => $userInfo, // Need to add this filed in database field type text/VARCHAR(250)
-            'user_id'    => $user->id,
-            'log_date'   => $dateTime,
-            'table_name' => 'users',
-            'log_type'   => 'login',
-            'data'       => json_encode($data)
-        ]);
+
+        DB::table('logtrackers')->insert($logData);
     }
 }

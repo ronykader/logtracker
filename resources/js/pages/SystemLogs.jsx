@@ -183,19 +183,31 @@ export default function SystemLogs() {
     const [selected, setSelected]   = useState(new Set());
     const [confirm, setConfirm]     = useState(null); // { type: 'clear'|'selected'|'single', payload }
     const [toast, setToast]         = useState(null);
+    
+    // Multi-file state
+    const [availableFiles, setFiles] = useState(['laravel.log']);
+    const [selectedFile, setFile]   = useState('laravel.log');
 
-    const fetchLogs = useCallback(() => {
+    const fetchLogs = useCallback((fileName = selectedFile) => {
         setLoading(true); setError(null); setSpinning(true); setSelected(new Set());
-        fetch(r['system-log-data'], {
+        const url = new URL(r['system-log-data'], window.location.origin);
+        url.searchParams.set('file', fileName);
+
+        fetch(url, {
             headers: { 'Accept': 'application/json', 'Cache-Control': 'no-store', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         })
             .then(res => res.json())
-            .then(json => { setLogs(json.data || []); setLoading(false); setSpinning(false); })
-            .catch(() => { setError('Could not read log file. Check storage/logs/laravel.log permissions.'); setLoading(false); setSpinning(false); });
-    }, []);
+            .then(json => { 
+                setLogs(json.data || []); 
+                if (json.files) setFiles(json.files);
+                setLoading(false); 
+                setSpinning(false); 
+            })
+            .catch(() => { setError(`Could not read ${fileName}. Check file permissions.`); setLoading(false); setSpinning(false); });
+    }, [selectedFile]);
 
-    useEffect(() => { fetchLogs(); }, []);
+    useEffect(() => { fetchLogs(); }, [selectedFile]);
 
     // ── Filtering ────────────────────────────────────────────────────────────
     const filtered = logs.filter(log => {
@@ -237,14 +249,14 @@ export default function SystemLogs() {
 
     const executeClear = () => {
         setConfirm(null);
-        postJson(r['system-log-clear'], {})
+        postJson(r['system-log-clear'], { file: selectedFile })
             .then(res => { setToast({ message: res.message || 'Log file cleared.', type: 'success' }); fetchLogs(); })
             .catch(err => setToast({ message: err.message || 'Failed to clear log file.', type: 'error' }));
     };
 
     const executeDelete = (timestamps) => {
         setConfirm(null);
-        postJson(r['system-log-delete'], { timestamps: [...timestamps] })
+        postJson(r['system-log-delete'], { timestamps: [...timestamps], file: selectedFile })
             .then(res => { setToast({ message: res.message || 'Deleted.', type: 'success' }); fetchLogs(); })
             .catch(err => setToast({ message: err.message || 'Failed to delete entries.', type: 'error' }));
     };
@@ -260,7 +272,13 @@ export default function SystemLogs() {
                         <Terminal size={17} color="#34d399" />
                     </div>
                     <div>
-                        <p style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', fontFamily: 'JetBrains Mono, monospace' }}>storage/logs/laravel.log</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <p style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', fontFamily: 'JetBrains Mono, monospace' }}>storage/logs/</p>
+                            <select value={selectedFile} onChange={e => setFile(e.target.value)}
+                                style={{ padding: '2px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, fontWeight: 700, color: '#6366f1', background: '#f5f3ff', outline: 'none', cursor: 'pointer' }}>
+                                {availableFiles.map(f => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                        </div>
                         <p style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginTop: 1 }}>Last {logs.length} entries &bull; Newest first</p>
                     </div>
                 </div>
@@ -361,8 +379,8 @@ export default function SystemLogs() {
                 <ConfirmDialog
                     message={
                         confirm.type === 'clear'
-                            ? 'This will permanently delete the entire laravel.log file contents. This action cannot be undone.'
-                            : `This will permanently delete ${confirm.type === 'single' ? 'this log entry' : `${confirm.payload.size} selected entries`} from the log file. This cannot be undone.`
+                            ? `This will permanently delete the entire "${selectedFile}" file contents. This action cannot be undone.`
+                            : `This will permanently delete ${confirm.type === 'single' ? 'this log entry' : `${confirm.payload.size} selected entries`} from "${selectedFile}". This cannot be undone.`
                     }
                     onConfirm={() => confirm.type === 'clear' ? executeClear() : executeDelete(confirm.payload)}
                     onCancel={() => setConfirm(null)}

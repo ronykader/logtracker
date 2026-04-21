@@ -197,18 +197,24 @@ class LogtrackerController extends Controller
     {
         $this->checkAuthorization();
         
-        $logFile = storage_path('logs/laravel.log');
-        if (!file_exists($logFile)) {
-            return response()->json(['data' => [], 'message' => 'Log file not found.']);
+        $logFile = $this->resolveLogPath($request);
+        if (!$logFile || !file_exists($logFile)) {
+            return response()->json([
+                'data' => [], 
+                'files' => $this->getAvailableLogs(),
+                'message' => 'Log file not found.'
+            ]);
         }
 
-        $lines = [];
         $fp = fopen($logFile, 'r');
+        if (!$fp) {
+            return response()->json(['data' => [], 'message' => 'Could not open log file.']);
+        }
         
-        // Read last 500 lines for performance
+        // Read last 1000 lines (increased from 500 for dated logs)
         $pos = -2;
         $count = 0;
-        $maxLines = 500;
+        $maxLines = 1000;
         
         fseek($fp, $pos, SEEK_END);
         while ($count < $maxLines && fseek($fp, $pos, SEEK_END) !== -1) {
@@ -223,7 +229,6 @@ class LogtrackerController extends Controller
         $currentEntry = null;
 
         while ($line = fgets($fp)) {
-            // Regex for standard Laravel log: [2026-04-20 20:29:21] local.ERROR: Message
             preg_match('/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.*)/', $line, $matches);
 
             if (!empty($matches)) {
@@ -238,7 +243,6 @@ class LogtrackerController extends Controller
                     'stack' => '',
                 ];
             } elseif ($currentEntry) {
-                // If it doesn't match, it's likely a stack trace or multiline message
                 $currentEntry['stack'] .= $line;
             }
         }
@@ -250,22 +254,23 @@ class LogtrackerController extends Controller
         fclose($fp);
 
         return response()->json([
-            'data' => array_reverse($logEntries),
-            'file' => basename($logFile)
+            'files' => $this->getAvailableLogs(),
+            'current_file' => basename($logFile),
+            'data' => array_reverse($logEntries)
         ]);
     }
 
     public function clearSystemLog(Request $request)
     {
         $this->checkAuthorization();
-        $logFile = storage_path('logs/laravel.log');
+        $logFile = $this->resolveLogPath($request);
 
-        if (!file_exists($logFile)) {
-            return response()->json(['success' => false, 'message' => 'Log file not found at: ' . $logFile], 404);
+        if (!$logFile || !file_exists($logFile)) {
+            return response()->json(['success' => false, 'message' => 'Log file not found.'], 404);
         }
 
         if (!is_writable($logFile)) {
-            return response()->json(['success' => false, 'message' => 'Not writable: ' . $logFile . ' — Run: chmod 664 ' . $logFile], 403);
+            return response()->json(['success' => false, 'message' => 'Log file is not writable.'], 403);
         }
 
         file_put_contents($logFile, '', LOCK_EX);
@@ -277,21 +282,15 @@ class LogtrackerController extends Controller
     {
         $this->checkAuthorization();
 
-        // Explicitly decode the raw JSON body — most reliable across all Laravel versions
         $body       = json_decode($request->getContent(), true) ?? [];
         $timestamps = $body['timestamps'] ?? [];
-
+        
         if (empty($timestamps)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No timestamps received.',
-                'debug'   => ['body' => $request->getContent(), 'content_type' => $request->header('Content-Type')],
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'No entries selected.'], 422);
         }
 
-        $logFile = storage_path('logs/laravel.log');
-
-        if (!file_exists($logFile)) {
+        $logFile = $this->resolveLogPath($request);
+        if (!$logFile || !file_exists($logFile)) {
             return response()->json(['success' => false, 'message' => 'Log file not found.'], 404);
         }
 
@@ -318,6 +317,44 @@ class LogtrackerController extends Controller
             'success' => true,
             'message' => $count . ' entr' . ($count === 1 ? 'y' : 'ies') . ' deleted.',
         ]);
+    }
+
+    /**
+     * Resolve and validate requested log file path.
+     */
+    private function resolveLogPath(Request $request): ?string
+    {
+        $input = $request->get('file', $request->json('file', 'laravel.log'));
+        
+        // Security: Remove any potential path traversal characters
+        $fileName = basename($input);
+        
+        // Security: Ensure it's a .log file
+        if (!str_ends_with($fileName, '.log')) {
+            return null;
+        }
+
+        return storage_path("logs/{$fileName}");
+    }
+
+    /**
+     * Get list of all available .log files in storage/logs
+     */
+    private function getAvailableLogs(): array
+    {
+        $dir = storage_path('logs');
+        if (!is_dir($dir)) return ['laravel.log'];
+
+        $files = glob($dir . '/*.log');
+        
+        // Sort by modification date (newest first)
+        usort($files, function($a, $b) {
+            return filemtime($b) - filemtime($a);
+        });
+
+        return array_map(function($path) {
+            return basename($path);
+        }, $files);
     }
 
     private function handleLocale(Request $request): void

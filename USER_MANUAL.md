@@ -51,17 +51,23 @@ Click the **View Details** (eye icon) on any log entry to open the high-fidelity
 *   **Route Name**: The internal Laravel route responsible for the change.
 
 ### Data Comparison
-The detail view provides a side-by-side comparison (where applicable):
-*   **Previous Data (Red)**: What the record looked like before the change.
-*   **Modified Data (Green)**: The new values after the update.
+The detail view provides a high-fidelity comparison with **Visual Highlighting**:
+*   **Previous Data (Light Red)**: What the record looked like before the change.
+*   **Modified Data (Light Green + Bold)**: The new values after the update.
+*   **JSON/Object Rendering**: Complex data (like arrays or formatted dates) is now clearly readable, automatically stringified to prevent rendering errors.
 *   *Note: Sensitive fields (like passwords) are automatically masked.*
 
 ---
 
-## 4. System Logs (New)
-The **System Log Viewer** transforms the raw `laravel.log` file into a high-fidelity diagnostic tool.
-*   **Level Badges**: Errors are highlighted in Red/Rose, Warnings in Amber, and Info in Blue.
+## 4. System Logs
+The **System Log Viewer** transforms the raw logs into a high-fidelity diagnostic tool.
+*   **Multi-file Support**: Switch between today's `laravel.log` and past daily logs (e.g., `laravel-2026-03-14.log`) using the file selector in the top toolbar.
+*   **Level Badges**: Errors are highlighted in Rose, Warnings in Amber, and Info in Blue.
 *   **Search and Filter**: Filter logs by level or search by keyword within the message and stack trace.
+*   **Management Actions**:
+    *   **Single Delete**: Remove individual noisy entries (trash icon).
+    *   **Bulk Delete**: Select multiple entries and remove them in one click.
+    *   **Clear All**: Wipe the currently selected log file (zero-byte clear).
 *   **Collapsible Stack Traces**: Deep-dive into technical errors without cluttering your view.
 
 ---

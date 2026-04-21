@@ -320,15 +320,40 @@ function DetailDrawer({ log, onClose }) {
                                         </thead>
                                         <tbody>
                                             {keys.map((key, idx) => {
-                                                const changed = String(oldData[key]) !== String(newData[key]);
+                                                const valOld = oldData[key];
+                                                const valNew = newData[key];
+                                                // More robust comparison for objects/arrays
+                                                const strOld = typeof valOld === 'object' ? JSON.stringify(valOld) : String(valOld ?? '');
+                                                const strNew = typeof valNew === 'object' ? JSON.stringify(valNew) : String(valNew ?? '');
+                                                const changed = strOld !== strNew;
+                                                
+                                                const formatVal = (v, isNew) => {
+                                                    if (v === null || v === undefined) return <span style={{ color: '#cbd5e1' }}>—</span>;
+                                                    const display = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+                                                    return (
+                                                        <div style={{ 
+                                                            padding: changed ? '2px 6px' : '0',
+                                                            background: changed ? (isNew ? '#dcfce7' : '#fee2e2') : 'transparent',
+                                                            borderRadius: 4,
+                                                            display: 'inline-block',
+                                                            color: changed ? (isNew ? '#166534' : '#991b1b') : 'inherit'
+                                                        }}>
+                                                            {display}
+                                                        </div>
+                                                    );
+                                                };
+
                                                 return (
-                                                    <tr key={key} style={{ background: changed ? '#fffbf5' : (idx % 2 === 0 ? '#fff' : '#fafafa'), borderBottom: '1px solid #f8fafc' }}>
-                                                        <td style={{ padding: '9px 14px', fontWeight: 700, color: '#475569', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{key}</td>
-                                                        <td style={{ padding: '9px 14px', color: '#f43f5e', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(oldData[key] ?? '')}>
-                                                            {String(oldData[key] ?? <span style={{ color: '#cbd5e1' }}>—</span>)}
+                                                    <tr key={key} style={{ background: changed ? '#fffbeb' : (idx % 2 === 0 ? '#fff' : '#fafafa'), borderBottom: '1px solid #f8fafc', transition: 'background 0.2s' }}>
+                                                        <td style={{ padding: '9px 14px', fontWeight: 700, color: '#475569', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                                                            {changed && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', marginRight: 6 }}></span>}
+                                                            {key}
                                                         </td>
-                                                        <td style={{ padding: '9px 14px', color: '#059669', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(newData[key] ?? '')}>
-                                                            {String(newData[key] ?? <span style={{ color: '#cbd5e1' }}>—</span>)}
+                                                        <td style={{ padding: '9px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={strOld}>
+                                                            {formatVal(valOld, false)}
+                                                        </td>
+                                                        <td style={{ padding: '9px 14px', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: changed ? 800 : 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={strNew}>
+                                                            {formatVal(valNew, true)}
                                                         </td>
                                                     </tr>
                                                 );

@@ -4,6 +4,7 @@ A high-performance, internationalized activity log manager for Laravel applicati
 
 ## Features
 - **Premium UI**: Glassmorphic, React-powered dashboard with **30-Day Activity Heatmaps** and interactive **Date Range Picker**.
+- **Log Management**: Full-featured **System Log Viewer** with support for multiple files (daily logs), entry deletion, and bulk clearing.
 - **i18n Ready**: Full support for English and Bengali locales.
 - **Granular Security**: Access control via User ID whitelisting.
 - **Performance**: Asynchronous logging support via Laravel Queues and **Optimized Batch Pruning**.
@@ -40,13 +41,19 @@ composer require obd/logtracker:dev-master
    ```
 
 3. **Add Trait to Models**:
-```php
-use Obd\Logtracker\Traits\Logtrackerable;
+   Automatically add the tracking trait to all your models:
+   ```bash
+   php artisan logtracker:install-trait
+   ```
 
-class Project extends Model {
-    use Logtrackerable;
-}
-```
+   *Alternatively, manually add to specific models:*
+   ```php
+   use Obd\Logtracker\Traits\Logtrackerable;
+
+   class Project extends Model {
+       use Logtrackerable;
+   }
+   ```
 
 ## Configuration (.env)
 
@@ -69,10 +76,18 @@ LOGTRACKER_MONGO_CONNECTION=mongodb
 LOGTRACKER_RETENTION_DAYS=90
 ```
 
-## Commands
 ### Synchronize logs to MongoDB:
 ```bash
 php artisan logtracker:sync-mongo
+```
+
+### Install Trait Automatically:
+Scan your model directory and inject the `Logtrackerable` trait:
+```bash
+php artisan logtracker:install-trait
+
+# Preview changes without modifying files:
+php artisan logtracker:install-trait --dry-run
 ```
 
 ### Prune Stale Logs:
@@ -85,8 +100,15 @@ php artisan logtracker:prune --days=30
 ```
 
 ### Automated Maintenance
-It is highly recommended to schedule the pruning command in your application's Task Scheduler (`routes/console.php` or `app/Console/Kernel.php`):
-
+It is highly recommended to schedule the pruning command:
 ```php
 $schedule->command('logtracker:prune')->daily();
+```
+
+## Updating
+When updating the package to a new version, always run the following to sync the latest UI assets:
+```bash
+composer update obd/logtracker
+php artisan vendor:publish --tag=logtracker-assets --force
+php artisan optimize:clear
 ```
