@@ -100,9 +100,9 @@ trait Logtrackerable
         ];
 
         // Check if queued logging is enabled
-        if (config('logtracker.queue_enabled', false)) {
+        if (config('obd_tracker.queue_enabled', false)) {
             \Obd\Logtracker\Jobs\LogTrackerJob::dispatch($logData)
-                ->onQueue(config('logtracker.queue_name', 'default'));
+                ->onQueue(config('obd_tracker.queue_name', 'default'));
         } else {
             DB::table(self::$logTable)->insert($logData);
         }
