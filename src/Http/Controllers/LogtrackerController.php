@@ -219,18 +219,23 @@ class LogtrackerController extends Controller
             return response()->json(['data' => [], 'message' => 'Could not open log file.']);
         }
         
-        // Read last 1000 lines (increased from 500 for dated logs)
+        // Read last 1000 lines
         $pos = -2;
         $count = 0;
         $maxLines = 1000;
         
-        fseek($fp, $pos, SEEK_END);
-        while ($count < $maxLines && fseek($fp, $pos, SEEK_END) !== -1) {
+        // Seek from end to find the 1000th newline
+        while ($count < $maxLines && fseek($fp, $pos, SEEK_END) === 0) {
             $char = fgetc($fp);
             if ($char === "\n") {
                 $count++;
             }
             $pos--;
+        }
+        
+        // If we reached the start of the file or seek failed, ensure we start at the beginning
+        if (fseek($fp, $pos, SEEK_END) !== 0) {
+            rewind($fp);
         }
         
         $logEntries = [];
