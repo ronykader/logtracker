@@ -10,11 +10,19 @@ use Obd\Logtracker\Models\Logtracker;
 class LogtrackerController extends Controller
 {
     
-    public function index(Request $request)
+    public function index()
     {
         $this->checkAuthorization();
-        $this->handleLocale($request);
         return view('logtracker::shell', ['config' => $this->buildConfig('audit')]);
+    }
+
+    /**
+     * Return UI configuration as JSON for standalone frontends.
+     */
+    public function getConfig()
+    {
+        $this->checkAuthorization();
+        return response()->json($this->buildConfig('audit'));
     }
 
     public function logApidata(Request $request)
@@ -211,18 +219,23 @@ class LogtrackerController extends Controller
             return response()->json(['data' => [], 'message' => 'Could not open log file.']);
         }
         
-        // Read last 1000 lines (increased from 500 for dated logs)
+        // Read last 1000 lines
         $pos = -2;
         $count = 0;
         $maxLines = 1000;
         
-        fseek($fp, $pos, SEEK_END);
-        while ($count < $maxLines && fseek($fp, $pos, SEEK_END) !== -1) {
+        // Seek from end to find the 1000th newline
+        while ($count < $maxLines && fseek($fp, $pos, SEEK_END) === 0) {
             $char = fgetc($fp);
             if ($char === "\n") {
                 $count++;
             }
             $pos--;
+        }
+        
+        // If we reached the start of the file or seek failed, ensure we start at the beginning
+        if (fseek($fp, $pos, SEEK_END) !== 0) {
+            rewind($fp);
         }
         
         $logEntries = [];
@@ -377,10 +390,11 @@ class LogtrackerController extends Controller
                 'index'                => route('logtracker.index'),
                 'insights'             => route('logtracker.insights'),
                 'system-logs'          => route('logtracker.system-logs'),
-                'api'                  => url(config('logtracker.api_prefix', 'api/audit-panel-data')),
+                'api'                  => url(config('obd_tracker.api_prefix', 'api/audit-panel-data')),
                 'system-log-data'      => route('logtracker.system-log-data'),
                 'system-log-clear'     => route('logtracker.system-log-clear'),
                 'system-log-delete'    => route('logtracker.system-log-delete'),
+                'ui-config'            => route('logtracker.ui-config'),
             ],
             'i18n' => [
                 'audit_panel'              => __('logtracker::ui.audit_panel'),
@@ -414,8 +428,40 @@ class LogtrackerController extends Controller
 
     private function checkAuthorization()
     {
+        // Layer 1: Secret Key Gate (for API-only projects without 'auth' middleware)
+        $secret = config('obd_tracker.access_secret');
+        if ($secret) {
+            $providedKey = request()->query('secret') ?? request()->header('X-Logtracker-Secret');
+            
+            // If a key is provided in the URL, validate and store in session
+            if ($providedKey) {
+                if (hash_equals($secret, $providedKey)) {
+                    session(['logtracker_authenticated' => true]);
+                    // Redirect to remove the secret from the URL (security: prevent it from showing in browser history/logs)
+                    if (request()->query('secret')) {
+                        $cleanUrl = request()->url();
+                        $params = request()->except('secret');
+                        $redirect = $params ? $cleanUrl . '?' . http_build_query($params) : $cleanUrl;
+                        abort(redirect($redirect));
+                    }
+                } else {
+                    abort(403, 'Invalid access key.');
+                }
+            }
+            
+            // If not authenticated via session, show the gate page
+            if (!session('logtracker_authenticated')) {
+                if (request()->expectsJson()) {
+                    abort(response()->json(['error' => 'Access key required. Add ?secret=YOUR_KEY or X-Logtracker-Secret header.'], 403));
+                }
+                // Render a simple login gate page
+                abort(response(view('logtracker::gate'), 403));
+            }
+        }
+
+        // Layer 2: User ID whitelist (for projects WITH auth middleware)
         $allowedIds = config('obd_tracker.allowed_user_ids', []);
-        if (!empty($allowedIds) && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
+        if (!empty($allowedIds) && auth()->id() && !in_array((string)auth()->id(), array_map('trim', $allowedIds))) {
             if (request()->expectsJson()) {
                 abort(response()->json(['error' => 'Unauthorized'], 403));
             }

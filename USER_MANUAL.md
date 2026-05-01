@@ -10,7 +10,7 @@ Welcome to the modernized **Logtracker** system. This guide will help you naviga
 The LogTracker Suite is usually accessible at `/audit-panel`.
 1. **Audit Trail**: View detailed database activity logs.
 2. **Analytics Insights**: Advanced charts and trend analysis.
-3. **System Logs**: Human-readable view of `laravel.log`.
+3. **System Logs**: Human-readable view of your application log files.
 
 ### Sidebar Navigation
 The professional sidebar allows you to switch between views instantly. It can be collapsed using the chevron icon in the top left for a focused workspace.
@@ -92,9 +92,67 @@ For high-security environments, logs can be mirrored to a MongoDB instance.
 
 | Issue | Potential Solution |
 | :--- | :--- |
-| **"Unauthorized Access"** | Your User ID must be added to the `LOGTRACKER_ALLOWED_IDS` in the environment file. |
-| **Missing URL/Routes** | Ensure the log entries were created after the Phase 5 modernization update. |
+| **"Route [login] not defined"** | **API-only projects**: Open `config/obd_tracker.php` and change `ui_middleware` and `api_middleware` to `['web']` (remove `'auth'`). |
+| **Unauthorized Access** | 1. Ensure your User ID is in `LOGTRACKER_ALLOWED_IDS`. <br> 2. If using an API project, ensure `LOGTRACKER_ACCESS_SECRET` is set and provided via `?secret=...`. |
+| **Config changes not working** | All config keys use the `obd_tracker` namespace. Ensure your published config file is at `config/obd_tracker.php`. |
+| **Missing URL/Routes** | Ensure the log entries were created after the modernization update. |
+| **UI not updating after package update** | Run `php artisan vendor:publish --tag=logtracker-assets --force` and hard-refresh browser (Ctrl+Shift+R). |
 | **Slow Dashboard Load** | Ensure all database migrations/indexes have been applied with `php artisan migrate`. |
+| **System Logs dropdown missing** | Clear cached views: `php artisan optimize:clear` and re-publish assets. |
+
+---
+
+## 7. Security Gates (For API Projects)
+
+When running Logtracker in an API-only project without Laravel's standard authentication, you should use the **Secret Key Gate**.
+
+### How it Works
+1.  **Direct Access**: Visit `/audit-panel`. You will be met with a premium **Secure Lock Page**.
+2.  **Unlock**: Enter the key defined in your `.env` file (`LOGTRACKER_ACCESS_SECRET`).
+3.  **Persistence**: The system will remember your access for the duration of your session.
+
+### URL Shortcut
+You can bypass the lock page by appending the secret directly to the URL:
+`https://your-api.com/audit-panel?secret=your-secure-key`
+
+*Note: The system automatically hides the secret from your browser history after the first load to keep your key secure.*
+
+### Header Authentication (For Developers)
+If you are developing a standalone UI or integration, you can provide the secret via the header:
+`X-Logtracker-Secret: your-secure-key`
+
+---
+
+## 8. Headless & Decoupled Integration
+
+Logtracker is a **Universal SPA**. You can build the UI once and host it on any project or subdomain (e.g., `audit.example.com`), connecting it to any Laravel project remotely.
+
+### Standalone Deployment
+1.  **Export Assets**: Copy the `dist/` folder from the package to your static server or CDN.
+2.  **Mount Point**: Create a simple HTML file with a `<div id="logtracker-root"></div>`.
+3.  **Configuration**: Before loading `app.js`, set your backend URL:
+    ```html
+    <script>
+        window.LOGTRACKER_API_URL = "https://api.yourbackend.com/audit-panel/ui-config";
+    </script>
+    <script src="/path/to/app.js"></script>
+    ```
+
+### Authentication (CSRF/Sanctum)
+When running headlessly, ensure your Laravel backend has **CORS** enabled for your UI domain. Logtracker automatically sends `credentials: 'same-origin'` headers, making it compatible with **Laravel Sanctum** cookies for secure, cross-domain authentication.
+
+---
+
+## 8. Security Features
+
+| Feature | Description |
+| :--- | :--- |
+| **User ID Whitelisting** | Only specified user IDs can access the panel (`LOGTRACKER_ALLOWED_IDS`). |
+| **Path Traversal Protection** | System log viewer uses `basename()` + `realpath()` to prevent directory traversal. |
+| **Extension Enforcement** | Only `.log` files can be read or managed. |
+| **Privacy Masking** | Model `$hidden` attributes (passwords, tokens) are automatically excluded from logs. |
+| **CSRF Protection** | All destructive POST routes are automatically CSRF-protected. |
+| **Config Namespace** | All settings use the `obd_tracker` namespace consistently. |
 
 ---
 *© 2026 Logtracker Audit System - Premium Enterprise Edition*

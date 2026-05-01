@@ -48,6 +48,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Secret Key Gate (For API-Only Projects)
+    |--------------------------------------------------------------------------
+    | For projects without Laravel's 'auth' middleware (e.g., API-only apps),
+    | set a secret key here to protect the audit panel. Users must provide 
+    | this key via URL (?secret=xxx) or header (X-Logtracker-Secret) to access.
+    | Once validated, the key is stored in the session.
+    |
+    | Leave null/empty for projects that use standard 'auth' middleware.
+    |
+    */
+    'access_secret' => env('LOGTRACKER_ACCESS_SECRET', null),
+
+    /*
+    |--------------------------------------------------------------------------
     | Data Retention
     |--------------------------------------------------------------------------
     | The number of days to keep logs before they are considered stale.
